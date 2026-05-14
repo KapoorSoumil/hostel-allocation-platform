@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  STUDENT
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum RoommateRequestStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum OtpPurpose {
+  ROOMMATE_VERIFICATION
+}
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  student         Student?
+  adminAuditLogs  AuditLog[]  @relation("AuditActor")
+  allocationsMade Allocation[] @relation("AllocatedBy")
+
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Student {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  registrationNumber String   @unique @map("registration_number") @db.VarChar(50)
+  name               String   @db.VarChar(255)
+  phone              String   @unique @db.VarChar(20)
+  department         String?  @db.VarChar(100)
+  year               Int?
+  gender             Gender?
+  cgpa               Decimal  @db.Decimal(4, 2)
+  rank               Int?
+  isAllocated        Boolean  @default(false) @map("is_allocated")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user                       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestedRoommateRequests  RoommateRequest[]  @relation("RoommateRequester")
+  receivedRoommateRequests   RoommateRequest[]  @relation("RequestedRoommate")
+  allocations                Allocation[]
+  roomOccupants              RoomOccupant[]
+
+  @@index([cgpa])
+  @@index([rank])
+  @@index([isAllocated])
+  @@index([department, year])
+  @@index([gender])
+  @@map("students")
+}
+
+model CounselingSlot {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(100)
+  startTime DateTime @map("start_time")
+  endTime   DateTime @map("end_time")
+  minRank   Int      @map("min_rank")
+  maxRank   Int      @map("max_rank")
+  isActive  Boolean  @default(false) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([minRank, maxRank])
+  @@index([startTime, endTime])
+  @@index([isActive])
+  @@map("counseling_slots")
+}
+
+model HostelBlock {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  gender      Gender?
+  description String?
+  totalRooms  Int      @default(0) @map("total_rooms")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  rooms Room[]
+
+  @@index([gender])
+  @@index([isActive])
+  @@map("hostel_blocks")
+}
+
+model RoomCategory {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @db.VarChar(50)
+  capacity  Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  rooms Room[]
+
+  @@map("room_categories")
+}
+
+model Room {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hostelBlockId    String   @map("hostel_block_id") @db.Uuid
+  categoryId       String   @map("category_id") @db.Uuid
+  roomNumber       String   @map("room_number") @db.VarChar(30)
+  floor            Int?
+  capacity         Int
+  currentOccupancy Int      @default(0) @map("current_occupancy")
+  isAvailable      Boolean  @default(true) @map("is_available")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  hostelBlock      HostelBlock       @relation(fields: [hostelBlockId], references: [id], onDelete: Restrict)
+  category         RoomCategory      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  roommateRequests RoommateRequest[]
+  allocations      Allocation[]
+  occupants        RoomOccupant[]
+
+  @@unique([hostelBlockId, roomNumber])
+  @@index([hostelBlockId])
+  @@index([categoryId])
+  @@index([isAvailable])
+  @@index([hostelBlockId, categoryId, isAvailable])
+  @@map("rooms")
+}
+
+model RoommateRequest {
+  id                  String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requesterStudentId  String                 @map("requester_student_id") @db.Uuid
+  roommateStudentId   String                 @map("roommate_student_id") @db.Uuid
+  roomId              String?                @map("room_id") @db.Uuid
+  status              RoommateRequestStatus  @default(PENDING)
+  createdAt           DateTime               @default(now()) @map("created_at")
+  verifiedAt          DateTime?              @map("verified_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+
+  requesterStudent Student          @relation("RoommateRequester", fields: [requesterStudentId], references: [id], onDelete: Cascade)
+  roommateStudent  Student          @relation("RequestedRoommate", fields: [roommateStudentId], references: [id], onDelete: Cascade)
+  room              Room?            @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  otpVerifications  OtpVerification[]
+
+  @@index([requesterStudentId])
+  @@index([roommateStudentId])
+  @@index([status])
+  @@index([roomId, status])
+  @@map("roommate_requests")
+}
+
+model OtpVerification {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roommateRequestId String     @map("roommate_request_id") @db.Uuid
+  phone             String     @db.VarChar(20)
+  otpHash           String     @map("otp_hash")
+  purpose           OtpPurpose @default(ROOMMATE_VERIFICATION)
+  expiresAt         DateTime   @map("expires_at")
+  verifiedAt        DateTime?  @map("verified_at")
+  attempts          Int        @default(0)
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  roommateRequest RoommateRequest @relation(fields: [roommateRequestId], references: [id], onDelete: Cascade)
+
+  @@index([phone])
+  @@index([expiresAt])
+  @@index([roommateRequestId, purpose])
+  @@map("otp_verifications")
+}
+
+model Allocation {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roomId            String   @map("room_id") @db.Uuid
+  studentId         String   @unique @map("student_id") @db.Uuid
+  allocatedByUserId String?  @map("allocated_by_user_id") @db.Uuid
+  allocationGroupId String   @map("allocation_group_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  room        Room    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  student     Student @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  allocatedBy User?   @relation("AllocatedBy", fields: [allocatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@index([allocationGroupId])
+  @@map("allocations")
+}
+
+model RoomOccupant {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  studentId String   @unique @map("student_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@index([roomId])
+  @@map("room_occupants")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id") @db.Uuid
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation("AuditActor", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
