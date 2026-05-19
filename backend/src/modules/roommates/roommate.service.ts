@@ -2,6 +2,7 @@ import { OtpPurpose, Prisma, RoommateRequestStatus } from "@prisma/client";
 import { randomInt } from "node:crypto";
 import { prisma } from "../../config/database";
 import { env } from "../../config/env";
+import { broadcastAdminRealtime, broadcastRealtime } from "../../realtime/realtime.service";
 import { hashPassword, verifyPassword } from "../../utils/password";
 import { normalizeRegistrationNumber } from "../../utils/database";
 import { HttpError } from "../../utils/http-error";
@@ -304,6 +305,9 @@ export async function createRoommateRequest(input: {
     include: requestInclude
   });
 
+  broadcastRealtime("ROOMMATE_REQUEST_CHANGED", { requestId });
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "roommate-request-created" });
+
   return {
     request: publicRequest(request),
     delivery: {
@@ -417,7 +421,11 @@ export async function verifyRoommateOtp(input: {
     include: requestInclude
   });
 
-  return publicRequest(verifiedRequest);
+  const result = publicRequest(verifiedRequest);
+  broadcastRealtime("ROOMMATE_REQUEST_CHANGED", { requestId: result.id, status: result.status });
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "roommate-request-verified" });
+
+  return result;
 }
 
 export async function listMyRoommateRequests(userId: string) {
@@ -483,5 +491,9 @@ export async function cancelRoommateRequest(input: {
     include: requestInclude
   });
 
-  return publicRequest(cancelled);
+  const result = publicRequest(cancelled);
+  broadcastRealtime("ROOMMATE_REQUEST_CHANGED", { requestId: result.id, status: result.status });
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "roommate-request-cancelled" });
+
+  return result;
 }

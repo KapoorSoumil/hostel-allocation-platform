@@ -2047,3 +2047,18 @@ prisma:query SELECT "public"."allocations"."id", "public"."allocations"."room_id
 prisma:query SELECT "public"."room_categories"."id", "public"."room_categories"."name" FROM "public"."room_categories" WHERE "public"."room_categories"."id" IN ($1,$2,$3,$4,$5) OFFSET $6
 [2026-05-19 16:05:39.279 +0530] [32mINFO[39m (21360): [36m::1 - - [19/May/2026:10:35:39 +0000] "GET /api/admin/allocations HTTP/1.1" 304 - "http://localhost:5173/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"[39m
 [2026-05-19 16:05:39.280 +0530] [32mINFO[39m (21360): [36m::1 - - [19/May/2026:10:35:39 +0000] "GET /api/admin/dashboard HTTP/1.1" 304 - "http://localhost:5173/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"[39m
+4:11:32 pm [tsx] change in ./src\server.ts Restarting...
+cprisma:info Starting a postgresql pool with 21 connections.
+[2026-05-19 16:11:33.121 +0530] [32mINFO[39m (6848): [36mDatabase connection established[39m
+[2026-05-19 16:11:33.123 +0530] [32mINFO[39m (6848): [36mRealtime WebSocket server mounted at /realtime[39m
+[2026-05-19 16:11:33.124 +0530] [32mINFO[39m (6848): [36mServer running on http://localhost:4000[39m
+4:12:02 pm [tsx] change in ./src\modules\admin\admin.service.ts Restarting...
+cprisma:info Starting a postgresql pool with 21 connections.
+[2026-05-19 16:12:03.008 +0530] [32mINFO[39m (14832): [36mDatabase connection established[39m
+[2026-05-19 16:12:03.011 +0530] [32mINFO[39m (14832): [36mRealtime WebSocket server mounted at /realtime[39m
+[2026-05-19 16:12:03.011 +0530] [32mINFO[39m (14832): [36mServer running on http://localhost:4000[39m
+4:14:04 pm [tsx] change in ./src\realtime\realtime.service.ts Restarting...
+cprisma:info Starting a postgresql pool with 21 connections.
+[2026-05-19 16:14:05.470 +0530] [32mINFO[39m (15016): [36mDatabase connection established[39m
+[2026-05-19 16:14:05.472 +0530] [32mINFO[39m (15016): [36mRealtime WebSocket server mounted at /realtime[39m
+[2026-05-19 16:14:05.472 +0530] [32mINFO[39m (15016): [36mServer running on http://localhost:4000[39m

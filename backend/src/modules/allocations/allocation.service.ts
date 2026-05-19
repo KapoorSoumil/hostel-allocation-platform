@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../../config/database";
+import { broadcastAdminRealtime, broadcastRealtime } from "../../realtime/realtime.service";
 import { HttpError } from "../../utils/http-error";
 
 function publicStudent(student: {
@@ -106,7 +107,7 @@ export async function allocateRoomForStudent(input: {
   roomId: string;
 }) {
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const student = await tx.student.findUnique({
         where: { userId: input.userId },
         select: {
@@ -261,6 +262,17 @@ export async function allocateRoomForStudent(input: {
         room: roomAfterAllocation
       });
     });
+
+    broadcastRealtime("ROOM_AVAILABILITY_CHANGED", { roomId: result.room.id });
+    broadcastRealtime("OCCUPANCY_CHANGED", { roomId: result.room.id });
+    broadcastRealtime("ALLOCATION_CREATED", {
+      allocationId: result.id,
+      roomId: result.room.id,
+      studentId: result.student.id
+    });
+    broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "allocation-created" });
+
+    return result;
   } catch (error) {
     if (error instanceof HttpError) {
       throw error;

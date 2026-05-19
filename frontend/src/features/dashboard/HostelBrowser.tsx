@@ -28,6 +28,7 @@ type HostelBrowserProps = {
   categories: RoomCategory[];
   initialAllocation: Allocation | null;
   allocationStatus: AllocationStatus;
+  realtimeVersion: number;
   onAllocated: (allocation: Allocation) => void;
 };
 
@@ -37,6 +38,7 @@ export function HostelBrowser({
   categories,
   initialAllocation,
   allocationStatus,
+  realtimeVersion,
   onAllocated
 }: HostelBrowserProps) {
   const [selectedHostelId, setSelectedHostelId] = useState(hostels[0]?.id ?? "");
@@ -88,7 +90,7 @@ export function HostelBrowser({
     }, 250);
 
     return () => window.clearTimeout(request);
-  }, [token, selectedHostelId, selectedCategoryId, search]);
+  }, [token, selectedHostelId, selectedCategoryId, search, realtimeVersion]);
 
   async function openRoom(roomId: string) {
     setIsLoadingDetail(true);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   BedDouble,
@@ -20,7 +20,9 @@ import {
   updateCounselingSlot
 } from "../../lib/api";
 import type { AdminDashboardData, AllocationReportRow } from "../../lib/types";
+import type { RealtimeMessage } from "../../lib/realtime";
 import { clearTokens } from "../../lib/storage";
+import { useRealtime } from "../../hooks/useRealtime";
 
 type AdminDashboardPageProps = {
   token: string;
@@ -33,6 +35,7 @@ export function AdminDashboardPage({ token, onLogout }: AdminDashboardPageProps)
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   async function loadAdminData() {
     setIsLoading(true);
@@ -54,7 +57,21 @@ export function AdminDashboardPage({ token, onLogout }: AdminDashboardPageProps)
 
   useEffect(() => {
     loadAdminData();
-  }, [token]);
+  }, [token, refreshVersion]);
+
+  const handleRealtimeMessage = useCallback((realtimeMessage: RealtimeMessage) => {
+    if (
+      realtimeMessage.event === "ADMIN_DASHBOARD_CHANGED" ||
+      realtimeMessage.event === "ROOM_AVAILABILITY_CHANGED" ||
+      realtimeMessage.event === "OCCUPANCY_CHANGED" ||
+      realtimeMessage.event === "COUNSELING_SLOT_CHANGED" ||
+      realtimeMessage.event === "ALLOCATION_CREATED"
+    ) {
+      setRefreshVersion((version) => version + 1);
+    }
+  }, []);
+
+  const realtime = useRealtime(token, handleRealtimeMessage);
 
   function handleLogout() {
     clearTokens();
@@ -115,6 +132,12 @@ export function AdminDashboardPage({ token, onLogout }: AdminDashboardPageProps)
           </button>
         </div>
       </header>
+
+      <div className="live-strip">
+        <span className={`live-dot live-${realtime.state.toLowerCase()}`} />
+        <strong>{realtime.state === "LIVE" ? "Realtime dashboard active" : realtime.state === "CONNECTING" ? "Connecting realtime dashboard" : "Realtime dashboard offline"}</strong>
+        <small>{realtime.lastEventAt ? `Last event ${new Date(realtime.lastEventAt).toLocaleTimeString("en-IN")}` : "Waiting for events"}</small>
+      </div>
 
       {message ? <p className="inline-success admin-alert">{message}</p> : null}
       {error ? <p className="inline-error admin-alert">{error}</p> : null}

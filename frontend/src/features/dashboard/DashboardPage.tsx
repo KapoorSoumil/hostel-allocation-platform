@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BedDouble,
   CalendarClock,
@@ -35,6 +35,8 @@ import type {
 } from "../../lib/types";
 import { formatDateTime, formatTimer } from "../../lib/format";
 import { clearTokens } from "../../lib/storage";
+import type { RealtimeMessage } from "../../lib/realtime";
+import { useRealtime } from "../../hooks/useRealtime";
 import { HostelBrowser } from "./HostelBrowser";
 
 type DashboardPageProps = {
@@ -57,6 +59,7 @@ export function DashboardPage({ token, onLogout }: DashboardPageProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -114,7 +117,21 @@ export function DashboardPage({ token, onLogout }: DashboardPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [token]);
+  }, [token, refreshVersion]);
+
+  const handleRealtimeMessage = useCallback((message: RealtimeMessage) => {
+    if (
+      message.event === "ROOM_AVAILABILITY_CHANGED" ||
+      message.event === "OCCUPANCY_CHANGED" ||
+      message.event === "COUNSELING_SLOT_CHANGED" ||
+      message.event === "ALLOCATION_CREATED" ||
+      message.event === "ROOMMATE_REQUEST_CHANGED"
+    ) {
+      setRefreshVersion((version) => version + 1);
+    }
+  }, []);
+
+  const realtime = useRealtime(token, handleRealtimeMessage);
 
   const totalAvailability = useMemo(() => {
     if (!data) {
@@ -170,6 +187,12 @@ export function DashboardPage({ token, onLogout }: DashboardPageProps) {
         </button>
       </header>
 
+      <div className="live-strip">
+        <span className={`live-dot live-${realtime.state.toLowerCase()}`} />
+        <strong>{realtime.state === "LIVE" ? "Live updates on" : realtime.state === "CONNECTING" ? "Connecting live updates" : "Live updates offline"}</strong>
+        <small>{realtime.lastEventAt ? `Last event ${new Date(realtime.lastEventAt).toLocaleTimeString("en-IN")}` : "Waiting for events"}</small>
+      </div>
+
       <section className="hero-band">
         <div>
           <p className="eyebrow">Current counseling standing</p>
@@ -222,6 +245,7 @@ export function DashboardPage({ token, onLogout }: DashboardPageProps) {
         categories={data.categories}
         initialAllocation={data.allocation}
         allocationStatus={data.allocationStatus}
+        realtimeVersion={refreshVersion}
         onAllocated={(allocation) =>
           setData((current) =>
             current

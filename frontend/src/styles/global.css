@@ -279,6 +279,46 @@ button {
   gap: 10px;
 }
 
+.live-strip {
+  max-width: 1280px;
+  min-height: 44px;
+  margin: 0 auto 18px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #dce5de;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.live-strip small {
+  margin-left: auto;
+  color: #687a71;
+  font-weight: 700;
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #b7c4bc;
+}
+
+.live-live {
+  background: #0e9f6e;
+  box-shadow: 0 0 0 5px rgba(14, 159, 110, 0.12);
+}
+
+.live-connecting {
+  background: #d49b16;
+}
+
+.live-offline {
+  background: #b4233b;
+}
+
 .hero-band,
 .panel {
   max-width: 1280px;

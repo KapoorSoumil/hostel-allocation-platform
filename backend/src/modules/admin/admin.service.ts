@@ -1,5 +1,6 @@
 import { Prisma, UserRole } from "@prisma/client";
 import { prisma } from "../../config/database";
+import { broadcastAdminRealtime, broadcastRealtime } from "../../realtime/realtime.service";
 import { hashPassword } from "../../utils/password";
 import { normalizeEmail, normalizeRegistrationNumber } from "../../utils/database";
 import { HttpError } from "../../utils/http-error";
@@ -260,6 +261,9 @@ export async function importStudents(input: { csv?: string; students?: ImportStu
     }
   });
 
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "students-imported" });
+  broadcastRealtime("COUNSELING_SLOT_CHANGED", { reason: "rank-recalculated" });
+
   return {
     imported: validRows.length,
     defaultPassword: DEFAULT_STUDENT_PASSWORD
@@ -272,11 +276,17 @@ export async function createHostel(data: {
   description?: string | null;
   isActive?: boolean;
 }) {
-  return prisma.hostelBlock.create({ data });
+  const hostel = await prisma.hostelBlock.create({ data });
+  broadcastRealtime("ROOM_AVAILABILITY_CHANGED", { hostelId: hostel.id });
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "hostel-created" });
+  return hostel;
 }
 
 export async function updateHostel(id: string, data: Parameters<typeof createHostel>[0]) {
-  return prisma.hostelBlock.update({ where: { id }, data });
+  const hostel = await prisma.hostelBlock.update({ where: { id }, data });
+  broadcastRealtime("ROOM_AVAILABILITY_CHANGED", { hostelId: hostel.id });
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "hostel-updated" });
+  return hostel;
 }
 
 export async function createRoom(data: {
@@ -292,6 +302,8 @@ export async function createRoom(data: {
     where: { id: data.hostelBlockId },
     data: { totalRooms: { increment: 1 } }
   });
+  broadcastRealtime("ROOM_AVAILABILITY_CHANGED", { roomId: room.id, hostelId: room.hostelBlockId });
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "room-created" });
   return room;
 }
 
@@ -303,7 +315,11 @@ export async function updateRoom(id: string, data: Parameters<typeof createRoom>
   if (data.capacity < existing.currentOccupancy) {
     throw new HttpError(400, "Capacity cannot be lower than current occupancy");
   }
-  return prisma.room.update({ where: { id }, data });
+  const room = await prisma.room.update({ where: { id }, data });
+  broadcastRealtime("ROOM_AVAILABILITY_CHANGED", { roomId: room.id, hostelId: room.hostelBlockId });
+  broadcastRealtime("OCCUPANCY_CHANGED", { roomId: room.id });
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "room-updated" });
+  return room;
 }
 
 export async function createCounselingSlot(data: {
@@ -314,9 +330,15 @@ export async function createCounselingSlot(data: {
   maxRank: number;
   isActive?: boolean;
 }) {
-  return prisma.counselingSlot.create({ data });
+  const slot = await prisma.counselingSlot.create({ data });
+  broadcastRealtime("COUNSELING_SLOT_CHANGED", { slotId: slot.id });
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "slot-created" });
+  return slot;
 }
 
 export async function updateCounselingSlot(id: string, data: Parameters<typeof createCounselingSlot>[0]) {
-  return prisma.counselingSlot.update({ where: { id }, data });
+  const slot = await prisma.counselingSlot.update({ where: { id }, data });
+  broadcastRealtime("COUNSELING_SLOT_CHANGED", { slotId: slot.id, isActive: slot.isActive });
+  broadcastAdminRealtime("ADMIN_DASHBOARD_CHANGED", { reason: "slot-updated" });
+  return slot;
 }

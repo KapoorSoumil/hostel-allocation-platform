@@ -1,6 +1,7 @@
 import { app } from "./app";
 import { connectDatabase, disconnectDatabase } from "./config/database";
 import { env } from "./config/env";
+import { initializeRealtime } from "./realtime/realtime.service";
 import { logger } from "./utils/logger";
 
 async function bootstrap() {
@@ -9,6 +10,7 @@ async function bootstrap() {
   const server = app.listen(env.PORT, () => {
     logger.info(`Server running on http://localhost:${env.PORT}`);
   });
+  initializeRealtime(server);
 
   const shutdown = async () => {
     logger.info("Shutting down server");
