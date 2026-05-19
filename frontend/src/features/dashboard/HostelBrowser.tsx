@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Bed,
   Building2,
+  CheckCircle2,
   DoorOpen,
   Eye,
   Filter,
@@ -10,8 +11,10 @@ import {
   UsersRound,
   X
 } from "lucide-react";
-import { getHostelRooms, getRoomDetail } from "../../lib/api";
+import { allocateRoom, getHostelRooms, getRoomDetail } from "../../lib/api";
 import type {
+  Allocation,
+  AllocationStatus,
   HostelBlock,
   HostelRoomSummary,
   RoomCategory,
@@ -23,9 +26,19 @@ type HostelBrowserProps = {
   token: string;
   hostels: HostelBlock[];
   categories: RoomCategory[];
+  initialAllocation: Allocation | null;
+  allocationStatus: AllocationStatus;
+  onAllocated: (allocation: Allocation) => void;
 };
 
-export function HostelBrowser({ token, hostels, categories }: HostelBrowserProps) {
+export function HostelBrowser({
+  token,
+  hostels,
+  categories,
+  initialAllocation,
+  allocationStatus,
+  onAllocated
+}: HostelBrowserProps) {
   const [selectedHostelId, setSelectedHostelId] = useState(hostels[0]?.id ?? "");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [search, setSearch] = useState("");
@@ -34,6 +47,8 @@ export function HostelBrowser({ token, hostels, categories }: HostelBrowserProps
   const [selectedRoom, setSelectedRoom] = useState<RoomDetail | null>(null);
   const [isLoadingRooms, setIsLoadingRooms] = useState(true);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [isAllocating, setIsAllocating] = useState(false);
+  const [allocation, setAllocation] = useState<Allocation | null>(initialAllocation);
   const [error, setError] = useState("");
 
   const selectedHostel = useMemo(
@@ -86,6 +101,39 @@ export function HostelBrowser({ token, hostels, categories }: HostelBrowserProps
       setError(err instanceof Error ? err.message : "Could not load room details");
     } finally {
       setIsLoadingDetail(false);
+    }
+  }
+
+  async function confirmAllocation(room: RoomDetail) {
+    const isConfirmed = window.confirm(
+      `Confirm allocation for Room ${room.roomNumber} in ${room.hostelBlock.name}?`
+    );
+
+    if (!isConfirmed) {
+      return;
+    }
+
+    setIsAllocating(true);
+    setError("");
+
+    try {
+      const response = await allocateRoom(token, room.id);
+      setAllocation(response.data.allocation);
+      onAllocated(response.data.allocation);
+      const [roomsResponse, detailResponse] = await Promise.all([
+        getHostelRooms(token, selectedHostelId, {
+          categoryId: selectedCategoryId || undefined,
+          search: search || undefined
+        }),
+        getRoomDetail(token, room.id)
+      ]);
+      setRooms(roomsResponse.data.rooms);
+      setSummary(roomsResponse.data.summary);
+      setSelectedRoom(detailResponse.data.room);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not allocate room");
+    } finally {
+      setIsAllocating(false);
     }
   }
 
@@ -192,8 +240,12 @@ export function HostelBrowser({ token, hostels, categories }: HostelBrowserProps
 
             <RoomDetailsPanel
               isLoading={isLoadingDetail}
+              isAllocating={isAllocating}
               room={selectedRoom}
+              allocation={allocation}
+              allocationStatus={allocationStatus}
               onClose={() => setSelectedRoom(null)}
+              onAllocate={confirmAllocation}
             />
           </div>
         </section>
@@ -253,11 +305,19 @@ function RoomCard({
 function RoomDetailsPanel({
   room,
   isLoading,
-  onClose
+  isAllocating,
+  allocation,
+  allocationStatus,
+  onClose,
+  onAllocate
 }: {
   room: RoomDetail | null;
   isLoading: boolean;
+  isAllocating: boolean;
+  allocation: Allocation | null;
+  allocationStatus: AllocationStatus;
   onClose: () => void;
+  onAllocate: (room: RoomDetail) => void;
 }) {
   if (isLoading) {
     return (
@@ -282,6 +342,7 @@ function RoomDetailsPanel({
   const occupancy = room.capacity
     ? Math.round((room.currentOccupancy / room.capacity) * 100)
     : 0;
+  const canAllocateRoom = allocationStatus.canAllocate && room.isAvailable && !allocation;
 
   return (
     <aside className="room-detail-panel">
@@ -340,6 +401,29 @@ function RoomDetailsPanel({
           <p>No occupants yet.</p>
         )}
       </div>
+
+      {allocation?.room.id === room.id ? (
+        <div className="allocation-success-mini">
+          <CheckCircle2 size={18} />
+          <span>Allocated to you</span>
+        </div>
+      ) : (
+        <button
+          className="primary-button allocation-button"
+          disabled={!canAllocateRoom || isAllocating}
+          onClick={() => onAllocate(room)}
+          type="button"
+        >
+          <CheckCircle2 size={18} />
+          {isAllocating ? "Allocating..." : allocation ? "Already allocated" : "Confirm allocation"}
+        </button>
+      )}
+
+      {!allocationStatus.canAllocate && !allocation ? (
+        <p className="helper-note">
+          Allocation opens only during your active counseling slot.
+        </p>
+      ) : null}
     </aside>
   );
 }

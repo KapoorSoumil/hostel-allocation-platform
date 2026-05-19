@@ -1,11 +1,17 @@
 import type {
   AuthUser,
+  AdminDashboardData,
+  Allocation,
+  AllocationReportRow,
+  AllocationStatus,
   CounselingSlot,
   HostelBlock,
   HostelRoomSummary,
   RoomDetail,
   RoomListItem,
   RoomCategory,
+  RoommateOtpDelivery,
+  RoommateRequest,
   SlotStatus,
   Student
 } from "./types";
@@ -51,6 +57,22 @@ export function studentLogin(input: {
   return request<LoginResult>("/auth/student/login", {
     method: "POST",
     body: JSON.stringify(input)
+  });
+}
+
+export function adminLogin(input: {
+  email: string;
+  password: string;
+}) {
+  return request<LoginResult>("/auth/admin/login", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export function getCurrentUser(token: string) {
+  return request<{ user: AuthUser }>("/auth/me", {
+    headers: { Authorization: `Bearer ${token}` }
   });
 }
 
@@ -111,5 +133,142 @@ export function getHostelRooms(
 export function getRoomDetail(token: string, roomId: string) {
   return request<{ room: RoomDetail }>(`/rooms/${roomId}`, {
     headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function allocateRoom(token: string, roomId: string) {
+  return request<{ allocation: Allocation }>("/allocations", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ roomId })
+  });
+}
+
+export function getCurrentAllocation(token: string) {
+  return request<{ allocation: Allocation | null }>("/allocations/me", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function getAllocationStatus(token: string) {
+  return request<AllocationStatus>("/allocations/status", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function getRoommateRequests(token: string) {
+  return request<{ requests: RoommateRequest[] }>("/roommates/me", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function createRoommateRequest(
+  token: string,
+  input: { registrationNumber: string; phone: string; roomId?: string }
+) {
+  return request<{
+    request: RoommateRequest;
+    delivery: RoommateOtpDelivery;
+  }>("/roommates/request", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input)
+  });
+}
+
+export function verifyRoommateOtp(
+  token: string,
+  input: { requestId: string; otp: string }
+) {
+  return request<{ request: RoommateRequest }>("/roommates/verify-otp", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input)
+  });
+}
+
+export function getAdminDashboard(token: string) {
+  return request<AdminDashboardData>("/admin/dashboard", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function getAllocationReport(token: string) {
+  return request<{ allocations: AllocationReportRow[] }>("/admin/allocations", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function importStudents(token: string, csv: string) {
+  return request<{ imported: number; defaultPassword: string }>("/admin/students/import", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ csv })
+  });
+}
+
+export function createHostel(
+  token: string,
+  input: { name: string; gender?: string | null; description?: string | null; isActive?: boolean }
+) {
+  return request<{ hostel: HostelBlock }>("/admin/hostels", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input)
+  });
+}
+
+export function createRoom(
+  token: string,
+  input: {
+    hostelBlockId: string;
+    categoryId: string;
+    roomNumber: string;
+    floor?: number | null;
+    capacity: number;
+    isAvailable?: boolean;
+  }
+) {
+  return request<{ room: RoomListItem }>("/admin/rooms", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input)
+  });
+}
+
+export function createCounselingSlot(
+  token: string,
+  input: {
+    name: string;
+    startTime: string;
+    endTime: string;
+    minRank: number;
+    maxRank: number;
+    isActive?: boolean;
+  }
+) {
+  return request<{ slot: CounselingSlot }>("/admin/counseling-slots", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input)
+  });
+}
+
+export function updateCounselingSlot(
+  token: string,
+  id: string,
+  input: {
+    name: string;
+    startTime: string;
+    endTime: string;
+    minRank: number;
+    maxRank: number;
+    isActive?: boolean;
+  }
+) {
+  return request<{ slot: CounselingSlot }>(`/admin/counseling-slots/${id}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input)
   });
 }

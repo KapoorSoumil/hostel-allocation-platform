@@ -2,21 +2,34 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BedDouble,
   CalendarClock,
+  CheckCircle2,
   DoorOpen,
   GraduationCap,
   LogOut,
-  Medal
+  Medal,
+  ShieldCheck,
+  UserPlus,
+  X
 } from "lucide-react";
 import {
+  createRoommateRequest,
+  getAllocationStatus,
+  getCurrentAllocation,
   getHostels,
   getRoomCategories,
+  getRoommateRequests,
   getStudentProfile,
-  getStudentSlot
+  getStudentSlot,
+  verifyRoommateOtp
 } from "../../lib/api";
 import type {
   CounselingSlot,
+  Allocation,
+  AllocationStatus,
   HostelBlock,
   RoomCategory,
+  RoommateOtpDelivery,
+  RoommateRequest,
   SlotStatus,
   Student
 } from "../../lib/types";
@@ -33,6 +46,9 @@ type DashboardData = {
   student: Student;
   slot: CounselingSlot | null;
   slotStatus: SlotStatus;
+  allocation: Allocation | null;
+  allocationStatus: AllocationStatus;
+  roommateRequests: RoommateRequest[];
   hostels: HostelBlock[];
   categories: RoomCategory[];
 };
@@ -52,9 +68,20 @@ export function DashboardPage({ token, onLogout }: DashboardPageProps) {
 
     async function loadDashboard() {
       try {
-        const [profile, slot, hostels, categories] = await Promise.all([
+        const [
+          profile,
+          slot,
+          allocation,
+          allocationStatus,
+          roommateRequests,
+          hostels,
+          categories
+        ] = await Promise.all([
           getStudentProfile(token),
           getStudentSlot(token),
+          getCurrentAllocation(token),
+          getAllocationStatus(token),
+          getRoommateRequests(token),
           getHostels(token),
           getRoomCategories(token)
         ]);
@@ -67,6 +94,9 @@ export function DashboardPage({ token, onLogout }: DashboardPageProps) {
           student: profile.data.student,
           slot: slot.data.slot,
           slotStatus: slot.data.status,
+          allocation: allocation.data.allocation,
+          allocationStatus: allocationStatus.data,
+          roommateRequests: roommateRequests.data.requests,
           hostels: hostels.data.hostels,
           categories: categories.data.categories
         });
@@ -176,7 +206,39 @@ export function DashboardPage({ token, onLogout }: DashboardPageProps) {
         </section>
       </section>
 
-      <HostelBrowser token={token} hostels={data.hostels} categories={data.categories} />
+      {data.allocation ? <AllocationConfirmation allocation={data.allocation} /> : null}
+
+      <RoommatePanel
+        token={token}
+        requests={data.roommateRequests}
+        onRequestsChange={(roommateRequests) =>
+          setData((current) => (current ? { ...current, roommateRequests } : current))
+        }
+      />
+
+      <HostelBrowser
+        token={token}
+        hostels={data.hostels}
+        categories={data.categories}
+        initialAllocation={data.allocation}
+        allocationStatus={data.allocationStatus}
+        onAllocated={(allocation) =>
+          setData((current) =>
+            current
+              ? {
+                  ...current,
+                  student: { ...current.student, isAllocated: true },
+                  allocation,
+                  allocationStatus: {
+                    ...current.allocationStatus,
+                    isAllocated: true,
+                    canAllocate: false
+                  }
+                }
+              : current
+          )
+        }
+      />
     </main>
   );
 }
@@ -261,5 +323,246 @@ function CategoryCard({ category }: { category: RoomCategory }) {
         <div style={{ width: `${occupancy}%` }} />
       </div>
     </article>
+  );
+}
+
+function AllocationConfirmation({ allocation }: { allocation: Allocation }) {
+  return (
+    <section className="allocation-confirmation">
+      <div className="confirmation-icon">
+        <CheckCircle2 size={24} />
+      </div>
+      <div>
+        <p className="eyebrow">Allocation confirmed</p>
+        <h2>
+          Room {allocation.room.roomNumber}, {allocation.room.hostelBlock.name}
+        </h2>
+        <p>{allocation.receipt.message}</p>
+      </div>
+      <div className="receipt-box">
+        <span>Receipt</span>
+        <strong>{allocation.receipt.receiptNumber}</strong>
+        <small>{new Date(allocation.receipt.issuedAt).toLocaleString("en-IN")}</small>
+      </div>
+    </section>
+  );
+}
+
+function RoommatePanel({
+  token,
+  requests,
+  onRequestsChange
+}: {
+  token: string;
+  requests: RoommateRequest[];
+  onRequestsChange: (requests: RoommateRequest[]) => void;
+}) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const verifiedCount = requests.filter((request) => request.status === "VERIFIED").length;
+
+  return (
+    <section className="roommate-panel">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Roommate verification</p>
+          <h2>Verified roommate choices</h2>
+        </div>
+        <button className="secondary-button" onClick={() => setIsModalOpen(true)} type="button">
+          <UserPlus size={18} /> Add roommate
+        </button>
+      </div>
+
+      <div className="roommate-summary-grid">
+        <div>
+          <span>Verified</span>
+          <strong>{verifiedCount}</strong>
+        </div>
+        <div>
+          <span>Pending</span>
+          <strong>{requests.filter((request) => request.status === "PENDING").length}</strong>
+        </div>
+      </div>
+
+      <div className="roommate-list">
+        {requests.length ? (
+          requests.map((request) => (
+            <article key={request.id}>
+              <div>
+                <strong>{request.roommateStudent.name}</strong>
+                <span>{request.roommateStudent.registrationNumber}</span>
+              </div>
+              <span className={`request-status status-${request.status.toLowerCase()}`}>
+                {request.status}
+              </span>
+            </article>
+          ))
+        ) : (
+          <p>No roommate requests yet.</p>
+        )}
+      </div>
+
+      {isModalOpen ? (
+        <RoommateModal
+          token={token}
+          onClose={() => setIsModalOpen(false)}
+          onRequestUpdated={(request) => {
+            const nextRequests = [
+              request,
+              ...requests.filter((existing) => existing.id !== request.id)
+            ];
+            onRequestsChange(nextRequests);
+          }}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function RoommateModal({
+  token,
+  onClose,
+  onRequestUpdated
+}: {
+  token: string;
+  onClose: () => void;
+  onRequestUpdated: (request: RoommateRequest) => void;
+}) {
+  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [activeRequest, setActiveRequest] = useState<RoommateRequest | null>(null);
+  const [delivery, setDelivery] = useState<RoommateOtpDelivery | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  async function submitRequest(event: React.FormEvent) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await createRoommateRequest(token, {
+        registrationNumber,
+        phone
+      });
+      setActiveRequest(response.data.request);
+      setDelivery(response.data.delivery);
+      onRequestUpdated(response.data.request);
+      setSuccess(`OTP sent to ${response.data.delivery.maskedPhone}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not generate OTP");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function submitOtp(event: React.FormEvent) {
+    event.preventDefault();
+
+    if (!activeRequest) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await verifyRoommateOtp(token, {
+        requestId: activeRequest.id,
+        otp
+      });
+      setActiveRequest(response.data.request);
+      onRequestUpdated(response.data.request);
+      setSuccess("Roommate verified successfully");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not verify OTP");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="roommate-modal" role="dialog" aria-modal="true" aria-labelledby="roommate-modal-title">
+        <div className="detail-heading">
+          <div>
+            <p className="eyebrow">Secure OTP check</p>
+            <h3 id="roommate-modal-title">Add roommate</h3>
+          </div>
+          <button onClick={onClose} type="button" title="Close roommate modal">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={submitRequest}>
+          <label className="field">
+            Roommate registration number
+            <span className="input-shell">
+              <UserPlus size={18} />
+              <input
+                value={registrationNumber}
+                onChange={(event) => setRegistrationNumber(event.target.value)}
+                placeholder="22CSE002"
+                disabled={Boolean(activeRequest)}
+              />
+            </span>
+          </label>
+
+          <label className="field">
+            Registered phone number
+            <span className="input-shell">
+              <ShieldCheck size={18} />
+              <input
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="9876500002"
+                disabled={Boolean(activeRequest)}
+              />
+            </span>
+          </label>
+
+          <button className="primary-button" disabled={isSubmitting || Boolean(activeRequest)} type="submit">
+            {isSubmitting && !activeRequest ? "Sending OTP..." : "Generate OTP"}
+          </button>
+        </form>
+
+        {activeRequest ? (
+          <form onSubmit={submitOtp}>
+            <label className="field">
+              Enter OTP
+              <span className="input-shell">
+                <ShieldCheck size={18} />
+                <input
+                  value={otp}
+                  onChange={(event) => setOtp(event.target.value)}
+                  placeholder="6 digit OTP"
+                  maxLength={6}
+                />
+              </span>
+            </label>
+            <button className="primary-button" disabled={isSubmitting || activeRequest.status === "VERIFIED"} type="submit">
+              {isSubmitting ? "Verifying..." : activeRequest.status === "VERIFIED" ? "Verified" : "Verify OTP"}
+            </button>
+          </form>
+        ) : null}
+
+        {delivery?.developmentOtp ? (
+          <p className="dev-otp-note">Development OTP: {delivery.developmentOtp}</p>
+        ) : null}
+
+        {activeRequest?.otp ? (
+          <p className="helper-note">
+            OTP expires {new Date(activeRequest.otp.expiresAt).toLocaleTimeString("en-IN")}. Attempts left:{" "}
+            {activeRequest.otp.attemptsRemaining}.
+          </p>
+        ) : null}
+
+        {success ? <p className="inline-success">{success}</p> : null}
+        {error ? <p className="inline-error">{error}</p> : null}
+      </section>
+    </div>
   );
 }
