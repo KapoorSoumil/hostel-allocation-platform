@@ -1,0 +1,8 @@
+.git
+node_modules
+dist
+.env
+*.log
+backend-dev*.log
+frontend-dev*.log
+coverage

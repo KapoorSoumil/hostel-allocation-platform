@@ -12,6 +12,7 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  TRUST_PROXY: z.coerce.boolean().default(false),
   LOG_LEVEL: z.string().default("info")
 });
 

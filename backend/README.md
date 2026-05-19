@@ -1,6 +1,6 @@
 # Hostel Allocation Backend
 
-Phase 1 backend foundation for a college hostel allocation platform.
+Express + TypeScript backend for the hostel allocation platform.
 
 ## Stack
 
@@ -11,6 +11,8 @@ Phase 1 backend foundation for a college hostel allocation platform.
 - Prisma ORM
 - JWT middleware skeleton
 - Pino logging
+- Prisma migrations
+- WebSocket realtime updates
 
 ## Setup
 
@@ -49,6 +51,7 @@ Use the pooler URL for `DATABASE_URL` and the direct URL for `DIRECT_URL`.
 npm run dev
 npm run build
 npm start
+npm run start:migrate
 npm run prisma:generate
 npm run prisma:migrate
 npm run prisma:studio
@@ -82,6 +85,7 @@ Detailed Supabase setup instructions are in [docs/supabase-setup.md](docs/supaba
 
 ```text
 GET /health
+GET /ready
 ```
 
 ## API Base
@@ -96,6 +100,31 @@ GET /health
 /api/allocations
 /api/admin
 ```
+
+Realtime:
+
+```text
+ws://localhost:4000/realtime?token=ACCESS_TOKEN
+```
+
+## Production
+
+```bash
+npm ci
+npm run prisma:generate
+npm run prisma:deploy
+npm run build
+npm start
+```
+
+Docker:
+
+```bash
+docker build -t hostel-allocation-backend .
+docker run --env-file .env -p 4000:4000 hostel-allocation-backend
+```
+
+See the root `DEPLOYMENT.md` for full deployment steps.
 
 Hostel browsing APIs:
 

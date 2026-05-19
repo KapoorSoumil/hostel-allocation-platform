@@ -10,6 +10,10 @@ import { logger } from "./utils/logger";
 
 export const app = express();
 
+if (env.TRUST_PROXY) {
+  app.set("trust proxy", 1);
+}
+
 app.use(helmet());
 app.use(
   cors({
@@ -31,6 +35,13 @@ app.get("/health", (_req, res) => {
   res.json({
     success: true,
     message: "Hostel allocation backend is healthy"
+  });
+});
+
+app.get("/ready", (_req, res) => {
+  res.json({
+    success: true,
+    message: "Hostel allocation backend is ready"
   });
 });
 

@@ -33,15 +33,31 @@ export type LoginResult = {
 };
 
 async function request<T>(path: string, options: RequestInit = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers
-    }
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20000);
+  let response: Response;
 
-  const payload = await response.json();
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      signal: options.signal ?? controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers
+      }
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Request timed out. Please try again.");
+    }
+
+    throw new Error("Network request failed. Please check the server connection.");
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : {};
 
   if (!response.ok) {
     throw new Error(payload.message ?? "Request failed");
