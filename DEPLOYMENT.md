@@ -121,3 +121,37 @@ Student: 22CSE001 / Password@123
 ```
 
 Change seeded passwords before any real deployment.
+
+## Railway Deployment
+
+Current Railway project:
+
+```text
+hostel-allocation-platform
+```
+
+Services:
+
+```text
+Postgres
+backend
+frontend
+```
+
+Live URLs:
+
+```text
+Frontend: https://frontend-production-1288f.up.railway.app
+Backend:  https://backend-production-b699.up.railway.app
+Health:   https://backend-production-b699.up.railway.app/health
+```
+
+The backend uses Railway Postgres through `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
+The frontend build uses:
+
+```env
+VITE_API_BASE_URL=https://backend-production-b699.up.railway.app/api
+VITE_REALTIME_URL=wss://backend-production-b699.up.railway.app/realtime
+```
+
+The production database has been seeded with demo data.
